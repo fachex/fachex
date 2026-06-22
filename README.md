@@ -39,7 +39,8 @@ second password, no manual mailbox creation.
 ## Documents
 
 - [`docs/opennube-config.md`](docs/opennube-config.md) — **the concrete profile for this deployment** (real domains, scope, the two critical rules). Read this first.
-- [`docs/email-vhost-setup.md`](docs/email-vhost-setup.md) — route `email.opennube.net` → SOGo while `webmail.*` stays Roundcube (nginx vhost + runbook).
+- [`docs/sogo-install.md`](docs/sogo-install.md) — **start here**: create the LXC and install SOGo (Proxmox + in-container scripts).
+- [`docs/email-vhost-setup.md`](docs/email-vhost-setup.md) — then route `email.opennube.net` → SOGo while `webmail.*` stays Roundcube (nginx vhost).
 - [`docs/architecture.md`](docs/architecture.md) — components, data flow, the SSO/auth model.
 - [`docs/deployment.md`](docs/deployment.md) — phased, step-by-step build on Proxmox.
 - [`docs/ad-provisioning.md`](docs/ad-provisioning.md) — the AD → Hestia/SOGo sync bridge.
