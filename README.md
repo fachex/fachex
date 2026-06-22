@@ -38,10 +38,21 @@ second password, no manual mailbox creation.
 
 ## Documents
 
+- [`docs/opennube-config.md`](docs/opennube-config.md) — **the concrete profile for this deployment** (real domains, scope, the two critical rules). Read this first.
+- [`docs/email-vhost-setup.md`](docs/email-vhost-setup.md) — route `email.opennube.net` → SOGo while `webmail.*` stays Roundcube (nginx vhost + runbook).
 - [`docs/architecture.md`](docs/architecture.md) — components, data flow, the SSO/auth model.
 - [`docs/deployment.md`](docs/deployment.md) — phased, step-by-step build on Proxmox.
 - [`docs/ad-provisioning.md`](docs/ad-provisioning.md) — the AD → Hestia/SOGo sync bridge.
 - [`docs/roadmap.md`](docs/roadmap.md) — what's next, including the "Pin" contribution.
+
+## Scope for this deployment
+
+- **AD-managed mailbox domain:** `opennube.net` only.
+- **`opennube.com`:** stays in M365 (identity only; never a Hestia mailbox/alias).
+- **Mailbox model:** one mailbox on `opennube.net` + aliases from AD.
+- **Everything else in Hestia (client + other opennube domains):** untouched.
+
+See `docs/opennube-config.md` for the full profile.
 
 ## Status
 

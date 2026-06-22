@@ -67,10 +67,16 @@ matches **all** of:
 
 ## Mapping rules
 
+> **opennube profile:** mailboxes are created on `opennube.net` keyed by
+> `sAMAccountName` (`jdoe` → `jdoe@opennube.net`), **not** by the AD `mail`
+> attribute (which is `@opennube.com` / M365). `opennube.com` is on the
+> `excludeDomains` list and never gets a Hestia mailbox or alias. See
+> `opennube-config.md`.
+
 | AD | Hestia action |
 |---|---|
-| In-scope user with `mail=user@dom` | Ensure `v-add-mail-account` exists; set quota from AD attr (e.g. `msExchMailboxQuota`) or default; set random password (AD is the real authority via Dovecot LDAP passdb). |
-| `proxyAddresses: smtp:alias@dom` | Ensure account alias exists; remove aliases no longer present. |
+| In-scope user | Ensure `v-add-mail-account <owner> opennube.net <sAMAccountName> <randpass> <quota>` exists; quota from AD attr (e.g. `msExchMailboxQuota`) or default; random password (AD is the real authority via Dovecot LDAP passdb). |
+| `proxyAddresses: smtp:alias@<managedAliasDomain>` | Ensure account alias exists; remove aliases no longer present. **Skip any address in `excludeDomains` (opennube.com).** |
 | `userAccountControl` ACCOUNTDISABLE bit set | `v-suspend-mail-account`. |
 | Re-enabled | `v-unsuspend-mail-account`. |
 | Out of scope / deleted | Suspend immediately; delete after `retentionDays` (config). Never hard-delete on first miss — guards against AD blips. |
