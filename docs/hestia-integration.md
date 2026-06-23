@@ -131,14 +131,16 @@ test happens in Phase 3 once AD auth is wired, using an AD user whose
 > `imaps://` and sends SNI (`mail.opennube.net`), so Dovecot serves the
 > per-domain LE cert — an expired one blocks mail even though the name matches.
 > (Connecting by IP without SNI returns Hestia's *default* cert
-> `CN=site.opennube.com`, which is a red herring.) The opennube mail cert was
-> found **expired**, and root cause was Hestia's **WAN IP misconfigured**
-> (`51.222.33.178` instead of `.182`), so the ACME http-01 challenge target was
-> wrong → `connection refused`. After fixing the WAN IP, retry
-> `v-update-letsencrypt-ssl` and check `/var/log/hestia/LE-*.log`. If http-01
-> still fails (private mail host), switch that cert to **DNS-01 via the OVH API**.
-> Re-verify with `openssl s_client -connect 192.168.91.14:993 -servername
-> mail.opennube.net </dev/null 2>/dev/null | openssl x509 -noout -dates`.
+> `CN=site.opennube.com`, a red herring. Also note `192.168.91.24` is just a
+> secondary IP on the same Hestia `ens18` NIC as `.14`.) The opennube mail cert
+> had **expired** because Hestia's **WAN IP was misconfigured** (`51.222.33.178`
+> vs `.182`), pointing the public A record and ACME http-01 target at the wrong
+> IP → `connection refused`. **Resolved:** after correcting the WAN IP so
+> `mail./webmail.opennube.net` resolve to `.182`, `v-update-letsencrypt-ssl`
+> reissued the cert (valid through ~Sep 2026). If a private mail host ever can't
+> use http-01, fall back to **DNS-01 via the OVH API**. Re-verify with
+> `openssl s_client -connect 192.168.91.14:993 -servername mail.opennube.net
+> </dev/null 2>/dev/null | openssl x509 -noout -dates`.
 
 Next: `docs/email-vhost-setup.md` (nginx front door, which also fixes the
 unstyled `:20000` page) and Phase 3 AD auth in `docs/deployment.md`.
