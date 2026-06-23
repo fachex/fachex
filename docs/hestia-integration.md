@@ -177,3 +177,29 @@ unstyled `:20000` page) and Phase 3 AD auth in `docs/deployment.md`.
 |---|---|
 | `192.168.91.14` | Hestia's IP on VLAN 5 (`192.168.91.?`) |
 | `mail.opennube.net` | Hostname Hestia's mail cert is issued for (e.g. `mail.opennube.net`) |
+
+## Phase 3 Part B — mailbox auth (verified findings)
+
+Observed: SOGo sends the **bare** `sAMAccountName` (e.g. `fabian.lazarte`) to
+Dovecot (`SOGoForceExternalLoginWithEmail = NO` → uses the UID). Hestia keys
+mailboxes by full address, so a domainless login fails.
+
+Mechanism (no consolidation; multi-domain via aggregation):
+1. **`auth_default_realm = opennube.net`** drop-in (`/etc/dovecot/conf.d/99-opennube-sogo.conf`)
+   → maps the bare login to the **primary** `@opennube.net` mailbox. Only affects
+   logins without an `@`, so all existing full-address logins are unaffected.
+   Apply with `doveconf -n` check + `systemctl reload dovecot` (no apt, no restart).
+2. **Password**: Hestia's Dovecot has **no LDAP module** (`libauthdb_ldap.so` absent),
+   so AD-password auth needs `dovecot-ldap` installed (carefully:
+   `NEEDRESTART_MODE=l apt-get install dovecot-ldap`, then dovecot-only reload).
+   The AD `passdb` uses `pass_filter = (sAMAccountName=%n)` — because every domain
+   mailbox for a person shares the local part, the AD password then authenticates
+   `@opennube.net`, `@opennube.ai`, `@myopennube.com` alike.
+3. **Aggregation**: SOGo primary = `@opennube.net`; the other domains added as
+   SOGo **auxiliary accounts** (`SOGoMailAuxiliaryUserAccountsEnabled = YES`),
+   each authenticating with the same AD password via the passdb above. Prefer this
+   over a shared Dovecot master user (which would expose shared creds in user
+   profiles). The provisioning bridge can later pre-seed the auxiliary accounts.
+
+Quick validation before the passdb: set the Hestia mailbox password equal to the
+user's AD password (`v-change-mail-account-password`) so SOGo pass-through works.
