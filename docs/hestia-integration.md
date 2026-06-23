@@ -203,3 +203,18 @@ Mechanism (no consolidation; multi-domain via aggregation):
 
 Quick validation before the passdb: set the Hestia mailbox password equal to the
 user's AD password (`v-change-mail-account-password`) so SOGo pass-through works.
+
+### Part B status — primary mailbox WORKING
+
+Verified end-to-end: AD login → SOGo → `auth_default_realm = opennube.net`
+maps the bare `sAMAccountName` → Dovecot opens `fabian.lazarte@opennube.net`,
+inbox loads. Log: `imap-login: Login: user=<fabian.lazarte@opennube.net>,
+rip=192.168.91.99`.
+
+Caveats / next:
+- Currently relies on the Hestia mailbox password == the user's AD password
+  (set manually). **Fragile** — replace with the AD `passdb` so Dovecot
+  validates against AD live (no sync). This is the production step.
+- From-identity still shows the AD `mail` attribute (`@opennube.com`, M365).
+  Fix: stop SOGo using `mail` for the address so it derives `uid@opennube.net`
+  (`MailFieldNames` → non-existent attr → fallback to `uid@SOGoMailDomain`).
