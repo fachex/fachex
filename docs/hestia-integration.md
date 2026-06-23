@@ -218,3 +218,13 @@ Caveats / next:
 - From-identity still shows the AD `mail` attribute (`@opennube.com`, M365).
   Fix: stop SOGo using `mail` for the address so it derives `uid@opennube.net`
   (`MailFieldNames` → non-existent attr → fallback to `uid@SOGoMailDomain`).
+
+### From-identity fixed
+
+SOGo derived the user's From from the AD `mail` attribute (`@opennube.com`/M365).
+Fix (container only): `MailFieldNames = ("mailLocalAddress")` (non-existent attr)
+→ SOGo falls back to `uid@SOGoMailDomain` = `@opennube.net`. The change only took
+effect after clearing SOGo's caches: `systemctl restart memcached sogo` AND
+`DELETE FROM sogo_user_profile WHERE c_uid='<user>'` (SOGo caches the LDAP user
+record in memcached + seeds the default identity in the profile on first login).
+Do NOT change the AD `mail` attribute — it's Entra/M365-synced.
