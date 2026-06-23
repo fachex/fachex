@@ -3,11 +3,11 @@
 Wire the SOGo container (902) to Hestia's Dovecot/Exim so it can read/send mail
 and save Sieve rules. Hestia stays the mailbox manager; SOGo is the front end.
 
-> Discovered values for opennube: `192.168.91.24` = **192.168.91.24**,
-> `mail.opennube.net` = **mail.opennube.net** (internal DNS already resolves the FQDN
-> to the private IP, so the `/etc/hosts` pin below is optional — keep it only as
-> a fallback). As of first test, **993 and 587 are open but 4190 is not** —
-> managesieve must be enabled on Hestia (below).
+> Discovered values for opennube: Hestia VLAN 5 IP = **192.168.91.24**, mail FQDN
+> = **mail.opennube.net** (internal DNS already resolves the FQDN to the private
+> IP, so the `/etc/hosts` pin below is optional — keep it only as a fallback).
+> As of first test, **993 and 587 are open but 4190 is not** — managesieve must
+> be enabled on Hestia (below).
 
 ## Network: dual-home the container
 
@@ -103,19 +103,32 @@ Permit only 902's VLAN 5 address to the mail ports:
 v-add-firewall-rule ACCEPT 192.168.91.99 993,587,4190 TCP "SOGo (CT902) to mail"
 ```
 
-## Test (before AD)
+## Test the backend (decoupled from SOGo login)
 
-Use an **existing Hestia mailbox** with its local Hestia password (AD auth comes
-in Phase 3):
+> **Why not just log into SOGo yet?** The shipped `sogo.conf` has the AD LDAP
+> source with a placeholder `bindPassword`. Until that bind works (Phase 3),
+> SOGo has no usable auth source, so the web login will fail regardless of the
+> mail backend. So first prove the Hestia mail path *independently* of SOGo:
 
-1. Browse to SOGo (direct `http://172.17.17.99:20000/SOGo`, or via
-   `email.opennube.net` once nginx is up).
-2. Log in as `someuser@opennube.net` + its Hestia password.
-3. Confirm: folders load, send a test mail, receive a test mail.
-4. Settings → Mail → Filters: create+save a test filter (proves managesieve).
+```bash
+# inside 902 — verify TLS cert name matches and IMAP answers
+openssl s_client -connect mail.opennube.net:993 -servername mail.opennube.net \
+  </dev/null 2>/dev/null | openssl x509 -noout -subject -dates -ext subjectAltName
 
-Green on all four = SOGo↔Hestia is wired. Next: `docs/email-vhost-setup.md`
-(nginx front door) and Phase 3 AD auth in `docs/deployment.md`.
+# verify a real mailbox can authenticate over IMAPS (use a test Hestia account)
+openssl s_client -crlf -connect mail.opennube.net:993 -servername mail.opennube.net
+#   a LOGIN test@opennube.net 'the-hestia-password'
+#   a LIST "" "*"
+#   a LOGOUT
+```
+
+If the cert subject/SAN includes `mail.opennube.net` and the IMAP `LOGIN`
+returns `a OK`, the SOGo→Hestia path is good. The end-to-end **SOGo web login**
+test happens in Phase 3 once AD auth is wired, using an AD user whose
+`opennube.net` mailbox exists in Hestia.
+
+Next: `docs/email-vhost-setup.md` (nginx front door, which also fixes the
+unstyled `:20000` page) and Phase 3 AD auth in `docs/deployment.md`.
 
 ## Values to fill
 
