@@ -14,6 +14,19 @@ pattern; this file is the source of truth for our actual names and scope.
 | Also in Hestia, **not** AD-managed | `opennube.ai`, `myopennube.com`, `opennube.cloud` | Left as-is. Can become alias domains later (see below). |
 | Client domains | (various) | **Never** touched by AD or `fachex-sync`. Manual in Hestia. |
 
+## Network / VLANs
+
+| VLAN | Subnet | Holds | SOGo CT 902 NIC |
+|---|---|---|---|
+| 12 | 172.17.17.0/24 | AD/DC (`.100`), nginx, mgmt | `eth0` `172.17.17.99/24` (default gw `.1`) |
+| 5  | 192.168.91.0/24 | Hestia (Dovecot/Exim) | `eth1` `192.168.91.99/24` (no gateway) |
+
+SOGo is **dual-homed**: VLAN 12 for AD + nginx, VLAN 5 for the Hestia mail
+backend. Default route stays on `eth0`. See `docs/hestia-integration.md`.
+
+- SOGo container (CTID): **902** on node09, bridge `vmbr1` (VLAN-aware trunk).
+- DNS resolver for the container: `10.11.12.240`; search domain `opennube.local`.
+
 ## Mailbox model
 
 - **One mailbox per user**, on `opennube.net`.
