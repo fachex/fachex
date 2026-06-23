@@ -228,3 +228,11 @@ effect after clearing SOGo's caches: `systemctl restart memcached sogo` AND
 `DELETE FROM sogo_user_profile WHERE c_uid='<user>'` (SOGo caches the LDAP user
 record in memcached + seeds the default identity in the profile on first login).
 Do NOT change the AD `mail` attribute — it's Entra/M365-synced.
+
+### Sending (SMTP) fixed
+
+Symptom: SOGo "cannot send message: (smtp) authentication failure"; Exim logged
+no auth attempt from the SOGo IP — it failed before AUTH (STARTTLS path on 587).
+Fix: use implicit-TLS submission. `SOGoSMTPServer = "smtps://mail.opennube.net:465"`
+(port 465 is open on Hestia: `465 (submissions) open`). Send then succeeds
+(`POST …/send 200`). Receive (IMAP 993) + send (SMTP 465) both working.
