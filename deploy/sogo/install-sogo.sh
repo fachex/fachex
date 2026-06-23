@@ -27,10 +27,19 @@ echo ">> [3/6] Install SOGo + PostgreSQL backend"
 apt-get update
 apt-get install -y sogo sope4.9-gdl1-postgresql
 
-echo ">> [4/6] PostgreSQL role + database for SOGo's own store"
+echo ">> [4/7] PostgreSQL role + database for SOGo's own store"
+# SOGo's bundled PostgreSQL client speaks md5, not SCRAM. PG14+ defaults to
+# scram-sha-256, which makes SOGo fail with "failed to acquire channel". Force
+# md5 for the sogo role + local auth.
+PGVER="$(ls /etc/postgresql | head -1)"
+sed -i 's/scram-sha-256/md5/g' "/etc/postgresql/${PGVER}/main/pg_hba.conf"
+runuser -u postgres -- psql -c "ALTER SYSTEM SET password_encryption='md5';"
+systemctl restart postgresql
 # Use runuser (always present) rather than sudo (absent on minimal LXC templates).
 if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='sogo'" | grep -q 1; then
   runuser -u postgres -- psql -c "CREATE USER sogo WITH PASSWORD '${PG_SOGO_PASS}';"
+else
+  runuser -u postgres -- psql -c "ALTER USER sogo PASSWORD '${PG_SOGO_PASS}';"
 fi
 if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='sogo'" | grep -q 1; then
   runuser -u postgres -- psql -c "CREATE DATABASE sogo OWNER sogo;"
