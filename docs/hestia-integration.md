@@ -3,7 +3,7 @@
 Wire the SOGo container (902) to Hestia's Dovecot/Exim so it can read/send mail
 and save Sieve rules. Hestia stays the mailbox manager; SOGo is the front end.
 
-> Discovered values for opennube: Hestia VLAN 5 IP = **192.168.91.24**, mail FQDN
+> Discovered values for opennube: Hestia VLAN 5 IP = **192.168.91.14**, mail FQDN
 > = **mail.opennube.net** (internal DNS already resolves the FQDN to the private
 > IP, so the `/etc/hosts` pin below is optional — keep it only as a fallback).
 > As of first test, **993 and 587 are open but 4190 is not** — managesieve must
@@ -35,8 +35,8 @@ pct reboot 902
 ```bash
 pct exec 902 -- ip -4 addr show eth1                  # expect 192.168.91.99
 pct exec 902 -- apt-get install -y netcat-openbsd
-pct exec 902 -- ping -c1 192.168.91.24
-pct exec 902 -- bash -c 'for p in 993 587 4190; do nc -zv 192.168.91.24 $p; done'
+pct exec 902 -- ping -c1 192.168.91.14
+pct exec 902 -- bash -c 'for p in 993 587 4190; do nc -zv 192.168.91.14 $p; done'
 ```
 
 ## TLS: connect by cert name, route to the private IP
@@ -47,7 +47,7 @@ container's hosts file:
 
 ```bash
 # inside 902
-echo "192.168.91.24   mail.opennube.net" >> /etc/hosts     # e.g. 192.168.91.10  mail.opennube.net
+echo "192.168.91.14   mail.opennube.net" >> /etc/hosts     # e.g. 192.168.91.10  mail.opennube.net
 ```
 
 Confirm the cert's CN/SAN (run on Hestia):
@@ -128,12 +128,17 @@ test happens in Phase 3 once AD auth is wired, using an AD user whose
 `opennube.net` mailbox exists in Hestia.
 
 > **Gotcha — check cert expiry, not just the name.** SOGo verifies TLS on
-> `imaps://`, so an expired cert blocks mail even though the hostname matches.
-> The opennube mail cert (LE, covers `mail.` + `webmail.opennube.net`) was found
-> **expired** on first check — Hestia's auto-renewal had been failing. Renew on
-> Hestia with `v-update-letsencrypt-ssl` and check `/var/log/hestia/LE-*.log`
-> for why it lapsed (usually a blocked http-01 challenge on port 80 or a stale
-> A record). Re-verify with `openssl ... | openssl x509 -noout -dates`.
+> `imaps://` and sends SNI (`mail.opennube.net`), so Dovecot serves the
+> per-domain LE cert — an expired one blocks mail even though the name matches.
+> (Connecting by IP without SNI returns Hestia's *default* cert
+> `CN=site.opennube.com`, which is a red herring.) The opennube mail cert was
+> found **expired**, and root cause was Hestia's **WAN IP misconfigured**
+> (`51.222.33.178` instead of `.182`), so the ACME http-01 challenge target was
+> wrong → `connection refused`. After fixing the WAN IP, retry
+> `v-update-letsencrypt-ssl` and check `/var/log/hestia/LE-*.log`. If http-01
+> still fails (private mail host), switch that cert to **DNS-01 via the OVH API**.
+> Re-verify with `openssl s_client -connect 192.168.91.14:993 -servername
+> mail.opennube.net </dev/null 2>/dev/null | openssl x509 -noout -dates`.
 
 Next: `docs/email-vhost-setup.md` (nginx front door, which also fixes the
 unstyled `:20000` page) and Phase 3 AD auth in `docs/deployment.md`.
@@ -142,5 +147,5 @@ unstyled `:20000` page) and Phase 3 AD auth in `docs/deployment.md`.
 
 | Placeholder | Meaning |
 |---|---|
-| `192.168.91.24` | Hestia's IP on VLAN 5 (`192.168.91.?`) |
+| `192.168.91.14` | Hestia's IP on VLAN 5 (`192.168.91.?`) |
 | `mail.opennube.net` | Hostname Hestia's mail cert is issued for (e.g. `mail.opennube.net`) |
