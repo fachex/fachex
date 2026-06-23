@@ -46,10 +46,25 @@ chmod 640 /etc/sogo/sogo.conf
 # Worker processes
 sed -i 's/^PREFORK=.*/PREFORK=5/' /etc/default/sogo 2>/dev/null || true
 
-echo ">> [6/6] Enable services"
+echo ">> [6/7] Enable SOGo services"
 systemctl enable --now memcached
 systemctl restart sogo
 systemctl enable sogo
+
+echo ">> [7/7] Front-end web server (nginx) serving WebServerResources"
+# SOGo pulls in apache2, which grabs :80 — we standardize on nginx instead.
+if systemctl is-enabled apache2 >/dev/null 2>&1 || systemctl is-active apache2 >/dev/null 2>&1; then
+  systemctl disable --now apache2 || true
+fi
+apt-get install -y nginx
+if [ -f /root/nginx-sogo.conf ]; then
+  cp /root/nginx-sogo.conf /etc/nginx/sites-available/sogo
+  ln -sf ../sites-available/sogo /etc/nginx/sites-enabled/sogo
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t && systemctl enable --now nginx && systemctl reload nginx
+else
+  echo "   (skip) /root/nginx-sogo.conf not found — deploy it manually, see docs/sogo-install.md"
+fi
 
 cat <<EOF
 
