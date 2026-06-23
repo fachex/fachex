@@ -58,4 +58,17 @@ See `docs/opennube-config.md` for the full profile.
 
 ## Status
 
-Planning / design. No services deployed yet. Start with `docs/deployment.md`.
+- ✅ **Phase 1 — SOGo deployed.** CT 902 (node09): SOGo v5 + PostgreSQL +
+  memcached. Front-end nginx in the container serves WebServerResources
+  (apache2 disabled to free :80).
+- ✅ **Phase 2 — Hestia mail wired.** Dual-homed to VLAN 5; IMAPS 993 +
+  submission 587 reachable; `mail.opennube.net` LE cert renewed (valid TLS).
+  managesieve (4190 / Rules UI) deferred — see `docs/hestia-integration.md`.
+- ✅ **Front door live.** `https://email.opennube.net` → dedicated nginx proxy
+  (Certbot TLS) → container nginx → SOGo. Styled login over HTTPS.
+- ⏳ **Phase 3 — AD authentication.** SOGo → AD (login + GAL), Dovecot auth,
+  one test `@opennube.net` mailbox. In progress.
+- ⏳ **Phase 4 — provisioning bridge** (`fachex-sync`), aliases, groups.
+
+Start here: `docs/sogo-install.md` → `docs/hestia-integration.md` →
+`docs/email-vhost-setup.md` → Phase 3 in `docs/deployment.md`.
