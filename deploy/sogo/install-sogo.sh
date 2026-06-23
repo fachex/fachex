@@ -28,11 +28,12 @@ apt-get update
 apt-get install -y sogo sope4.9-gdl1-postgresql
 
 echo ">> [4/6] PostgreSQL role + database for SOGo's own store"
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='sogo'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE USER sogo WITH PASSWORD '${PG_SOGO_PASS}';"
+# Use runuser (always present) rather than sudo (absent on minimal LXC templates).
+if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='sogo'" | grep -q 1; then
+  runuser -u postgres -- psql -c "CREATE USER sogo WITH PASSWORD '${PG_SOGO_PASS}';"
 fi
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='sogo'" | grep -q 1; then
-  sudo -u postgres psql -c "CREATE DATABASE sogo OWNER sogo;"
+if ! runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname='sogo'" | grep -q 1; then
+  runuser -u postgres -- psql -c "CREATE DATABASE sogo OWNER sogo;"
 fi
 
 echo ">> [5/6] Render /etc/sogo/sogo.conf"
