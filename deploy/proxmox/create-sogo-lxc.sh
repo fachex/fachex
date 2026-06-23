@@ -5,18 +5,21 @@
 # Edit the vars below, then: bash create-sogo-lxc.sh
 set -euo pipefail
 
-# --- Edit these ---------------------------------------------------------------
-CTID="${CTID:-150}"                       # unused container ID
+# --- Edit these (defaults match the live opennube container, CTID 902) --------
+CTID="${CTID:-902}"                        # unused container ID
 HOSTNAME_="${HOSTNAME_:-sogo}"
 CORES="${CORES:-2}"
-MEMORY="${MEMORY:-4096}"                   # MB
-SWAP="${SWAP:-1024}"                       # MB
+MEMORY="${MEMORY:-4096}"                    # MB
+SWAP="${SWAP:-1024}"                        # MB
 DISK_GB="${DISK_GB:-20}"
-STORAGE="${STORAGE:-local-lvm}"            # rootfs storage
-TEMPLATE_STORE="${TEMPLATE_STORE:-local}"  # where templates live
-BRIDGE="${BRIDGE:-vmbr0}"
-IP_CIDR="${IP_CIDR:-10.0.0.50/24}"         # SOGo LXC LAN IP
-GATEWAY="${GATEWAY:-10.0.0.1}"
+STORAGE="${STORAGE:-local}"                 # rootfs storage
+TEMPLATE_STORE="${TEMPLATE_STORE:-local}"   # where templates live
+BRIDGE="${BRIDGE:-vmbr1}"
+IP_CIDR="${IP_CIDR:-172.17.17.99/24}"       # SOGo LXC IP (note: /24 must match GATEWAY's subnet)
+GATEWAY="${GATEWAY:-172.17.17.1}"
+NAMESERVER="${NAMESERVER:-10.11.12.240}"
+SEARCHDOMAIN="${SEARCHDOMAIN:-opennube.local}"
+TAGS="${TAGS:-opennube}"
 # ------------------------------------------------------------------------------
 
 TEMPLATE="debian-12-standard_12.7-1_amd64.tar.zst"   # verify exact name below
@@ -35,7 +38,9 @@ pct create "${CTID}" "${TEMPLATE_STORE}:vztmpl/${TEMPLATE}" \
   --hostname "${HOSTNAME_}" \
   --cores "${CORES}" --memory "${MEMORY}" --swap "${SWAP}" \
   --rootfs "${STORAGE}:${DISK_GB}" \
-  --net0 "name=eth0,bridge=${BRIDGE},ip=${IP_CIDR},gw=${GATEWAY}" \
+  --net0 "name=eth0,bridge=${BRIDGE},firewall=1,ip=${IP_CIDR},gw=${GATEWAY}" \
+  --nameserver "${NAMESERVER}" --searchdomain "${SEARCHDOMAIN}" \
+  --tags "${TAGS}" \
   --unprivileged 1 --features nesting=1 \
   --onboot 1 --start 1
 

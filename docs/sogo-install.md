@@ -10,23 +10,37 @@ Scripts (pre-filled for opennube):
 
 ## 1. Create the container (on a Proxmox node)
 
-Edit the vars at the top of `create-sogo-lxc.sh` (CTID, IP, storage, bridge),
-then:
+The live container is **CTID 902** (`sogo`) on node09. If recreating, the
+defaults in `create-sogo-lxc.sh` match it (vmbr1, storage `local`,
+`172.17.17.99/24`, gw `172.17.17.1`):
 
 ```bash
 bash deploy/proxmox/create-sogo-lxc.sh
 ```
 
-Defaults: CTID 150, 2 vCPU, 4 GB RAM, 20 GB disk, IP `10.0.0.50/24`. Verify the
-exact Debian 12 template name with `pveam available | grep debian-12` if the
-download step complains.
+> **Network sanity check:** the container IP and gateway must be in the same
+> /24. Use `ip=172.17.17.99/24` with `gw=172.17.17.1` — an IP like
+> `17.17.17.99/24` cannot reach a `172.17.17.1` gateway and leaves the
+> container with no outbound network (apt will fail). Fix an existing container
+> with:
+> ```bash
+> pct set 902 -net0 name=eth0,bridge=vmbr1,firewall=1,gw=172.17.17.1,ip=172.17.17.99/24,type=veth
+> pct set 902 -searchdomain opennube.local
+> pct reboot 902
+> ```
+
+Verify before installing:
+```bash
+pct exec 902 -- ping -c1 172.17.17.1      # gateway
+pct exec 902 -- ping -c1 deb.debian.org   # DNS + outbound
+```
 
 ## 2. Install SOGo (push scripts into the container, run installer)
 
 ```bash
-pct push 150 deploy/sogo/install-sogo.sh /root/install-sogo.sh
-pct push 150 deploy/sogo/sogo.conf       /root/sogo.conf.tmpl
-pct exec 150 -- bash /root/install-sogo.sh
+pct push 902 deploy/sogo/install-sogo.sh /root/install-sogo.sh
+pct push 902 deploy/sogo/sogo.conf       /root/sogo.conf.tmpl
+pct exec 902 -- bash /root/install-sogo.sh
 ```
 
 The installer:
@@ -44,7 +58,7 @@ The installer:
 From a host on the LAN:
 
 ```bash
-curl -I http://10.0.0.50:20000/SOGo      # expect 200/redirect
+curl -I http://172.17.17.99:20000/SOGo   # expect 200/redirect
 ```
 
 At this point SOGo runs but isn't usable end-to-end yet — it still needs the
