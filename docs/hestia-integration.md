@@ -74,7 +74,26 @@ SOGoSieveServer = "sieve://mail.opennube.net:4190";  # managesieve + STARTTLS
 
 ## Hestia side
 
-### 1. Enable managesieve (so SOGo's Rules UI works)
+### 1. Enable managesieve (so SOGo's Rules UI works) — DEFERRED, OPTIONAL
+
+> ⚠️ **Deferred on purpose.** managesieve only powers SOGo's server-side
+> Rules/filters UI — mail, calendar, contacts and send/receive all work without
+> it. On this VM, `apt-get install dovecot-managesieved` triggered Debian
+> **`needrestart`**, which auto-restarted MariaDB; MariaDB failed to come back
+> and **all `webmail.*` went down** until `systemctl start mariadb`. As of the
+> last check, `ss -ltnp | grep 4190` shows **nothing listening**. So leave this
+> for a planned maintenance window and use the Hestia-native path, with
+> `needrestart` in list-only mode so no service is auto-bounced:
+>
+> ```bash
+> # ALWAYS prefix installs on the Hestia VM:
+> NEEDRESTART_MODE=l apt-get install -y dovecot-managesieved
+> ```
+> Then enable the `sieve` protocol + the `managesieve-login` inet listener (4190)
+> via Hestia's own Dovecot template, not by hand-editing conf.d, and restart
+> Dovecot only (`systemctl restart dovecot` — never a blanket restart).
+
+Reference (for the maintenance window — do not apply live without the above):
 
 Ensure Pigeonhole + managesieve are present and listening on 4190:
 
@@ -141,6 +160,13 @@ test happens in Phase 3 once AD auth is wired, using an AD user whose
 > use http-01, fall back to **DNS-01 via the OVH API**. Re-verify with
 > `openssl s_client -connect 192.168.91.14:993 -servername mail.opennube.net
 > </dev/null 2>/dev/null | openssl x509 -noout -dates`.
+
+## Phase 2 status
+
+**Done:** valid TLS (`mail.opennube.net`, renewed through ~Sep 2026), IMAP 993
+and submission 587 reachable from CT 902 over VLAN 5. SOGo has everything it
+needs to function.
+**Deferred:** managesieve / port 4190 (Rules UI only) — see the warning above.
 
 Next: `docs/email-vhost-setup.md` (nginx front door, which also fixes the
 unstyled `:20000` page) and Phase 3 AD auth in `docs/deployment.md`.
