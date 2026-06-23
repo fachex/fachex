@@ -8,8 +8,7 @@ pattern; this file is the source of truth for our actual names and scope.
 
 | Thing | Value | Role |
 |---|---|---|
-| AD/DC domain | `opennube.local` | Internal AD (LDAP). Login = `sAMAccountName`. |
-| Identity / UPN / `mail` domain | `opennube.com` | Synced to Entra/M365. **Mailboxes live in Exchange Online.** Identity only for SOGo. |
+| AD/DC domain | `opennube.local` | Internal AD (LDAP). Login = `sAMAccountName`. || Identity / UPN / `mail` domain | `opennube.com` | Synced to Entra/M365. **Mailboxes live in Exchange Online.** Identity only for SOGo. |
 | **SOGo/Hestia mailbox domain** | `opennube.net` | The one domain the AD bridge manages. Primary SOGo address = `<sAMAccountName>@opennube.net`. |
 | Also in Hestia, **not** AD-managed | `opennube.ai`, `myopennube.com`, `opennube.cloud` | Left as-is. Can become alias domains later (see below). |
 | Client domains | (various) | **Never** touched by AD or `fachex-sync`. Manual in Hestia. |
@@ -26,6 +25,18 @@ backend. Default route stays on `eth0`. See `docs/hestia-integration.md`.
 
 - SOGo container (CTID): **902** on node09, bridge `vmbr1` (VLAN-aware trunk).
 - DNS resolver for the container: `10.11.12.240`; search domain `opennube.local`.
+
+## Active Directory (verified)
+
+| Fact | Value |
+|---|---|
+| DC (LDAPS) | `ONAD1.opennube.local` (172.17.17.100), 389 + 636 open |
+| Base DN (mail users) | `OU=Users,OU=OpenNube Co,DC=opennube,DC=local` (search base `OU=OpenNube Co,DC=opennube,DC=local`) |
+| Groups | `OU=Groups,OU=OpenNube Co,DC=opennube,DC=local` |
+| Bind account | `CN=svc-mail,OU=Service Accounts,DC=opennube,DC=local` (read-only) |
+| Login attr | `sAMAccountName` (e.g. `fabian.lazarte`) |
+| UPN suffix | `@opennube.local` (e.g. `fabian.lazarte@opennube.local`) |
+| LDAPS cert | works; DC cert must be trusted by the SOGo container (TLS_CACERT) |
 
 ## Mailbox model
 
