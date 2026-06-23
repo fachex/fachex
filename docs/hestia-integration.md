@@ -127,6 +127,14 @@ returns `a OK`, the SOGo→Hestia path is good. The end-to-end **SOGo web login*
 test happens in Phase 3 once AD auth is wired, using an AD user whose
 `opennube.net` mailbox exists in Hestia.
 
+> **Gotcha — check cert expiry, not just the name.** SOGo verifies TLS on
+> `imaps://`, so an expired cert blocks mail even though the hostname matches.
+> The opennube mail cert (LE, covers `mail.` + `webmail.opennube.net`) was found
+> **expired** on first check — Hestia's auto-renewal had been failing. Renew on
+> Hestia with `v-update-letsencrypt-ssl` and check `/var/log/hestia/LE-*.log`
+> for why it lapsed (usually a blocked http-01 challenge on port 80 or a stale
+> A record). Re-verify with `openssl ... | openssl x509 -noout -dates`.
+
 Next: `docs/email-vhost-setup.md` (nginx front door, which also fixes the
 unstyled `:20000` page) and Phase 3 AD auth in `docs/deployment.md`.
 
