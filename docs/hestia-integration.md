@@ -262,3 +262,30 @@ ignoreip = 127.0.0.1/8 ::1 192.168.91.99 172.17.17.99
 `fail2ban-client -t` then `systemctl restart fail2ban`; verify with
 `fail2ban-client get ssh-iptables ignoreip`. This stops a SOGo user's password
 typo from banning the whole SOGo container's mail access.
+
+### Operations: client offices getting fail2ban-banned (recurring)
+
+Symptom: a client can log into webmail (Roundcube → IMAP over localhost) but
+Outlook/phone "cannot connect" (POP3/IMAP/SMTP). Cause: the office's shared
+public IP got banned by fail2ban — usually one device there with a stale
+password tripping `maxretry=5`, then the `recidive` jail bans **all ports for
+10 days** (`bantime=864000`). There was no persistent whitelist; the historical
+"fix" was manual `unbanip` (so it kept recurring).
+
+**Permanent fix — whitelist trusted client office IPs** in the drop-in
+`/etc/fail2ban/jail.d/zzz-opennube-ignoreip.local`:
+```
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1 192.168.91.99 172.17.17.99 <office-ip> ...
+```
+`fail2ban-client -t && systemctl reload fail2ban`; verify with
+`fail2ban-client get dovecot-iptables ignoreip`.
+
+Diagnose a ban: `for j in recidive dovecot-iptables exim-iptables; do
+fail2ban-client status "$j" | grep <ip>; done`. Unban now:
+`fail2ban-client set <jail> unbanip <ip>`.
+
+Known office whitelists: pegfl.com office = **97.68.63.250**.
+Also: find the offending device (`grep <ip> /var/log/dovecot.log | grep -iE
+'mismatch|auth failed'`) and fix its saved password; consider lowering recidive
+`bantime` to 1–2 days so accidental legit bans aren't so punishing.
