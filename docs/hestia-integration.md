@@ -236,3 +236,14 @@ no auth attempt from the SOGo IP — it failed before AUTH (STARTTLS path on 587
 Fix: use implicit-TLS submission. `SOGoSMTPServer = "smtps://mail.opennube.net:465"`
 (port 465 is open on Hestia: `465 (submissions) open`). Send then succeeds
 (`POST …/send 200`). Receive (IMAP 993) + send (SMTP 465) both working.
+
+### Sending (SMTP) — CORRECTED fix
+
+The working setting is **`SOGoSMTPServer = "smtp://mail.opennube.net:587/?tls=YES"`**
+(NOT `smtps://465`). On plain `smtp://587` SOGo never issues STARTTLS, so Exim
+doesn't offer AUTH (AUTH is only advertised post-STARTTLS) → SOGo fails before
+auth → HTTP 405 on /send, and Exim logs a connection with no auth attempt. The
+`?tls=YES` query param forces SOGo to STARTTLS (mirrors the `?tls=` param SOGo
+uses on its IMAP URL). Verified: `swaks` to both 465 and 587 authenticated +
+sent fine (server was always healthy), and after the param SOGo sends:
+`<= … A=dovecot_plain:fabian.lazarte@opennube.net … id=…@opennube.net`.
