@@ -247,3 +247,18 @@ auth → HTTP 405 on /send, and Exim logs a connection with no auth attempt. The
 uses on its IMAP URL). Verified: `swaks` to both 465 and 587 authenticated +
 sent fine (server was always healthy), and after the param SOGo sends:
 `<= … A=dovecot_plain:fabian.lazarte@opennube.net … id=…@opennube.net`.
+
+### fail2ban: whitelist the SOGo/proxy IPs (drop-in, Hestia-safe)
+
+Hestia's `jail.local` has no `[DEFAULT]` section (it jumps straight into
+`[ssh-iptables]`…`[recidive]`), so adding `ignoreip` there lands under the last
+jail, not globally. Instead add a drop-in (survives Hestia regen of jail.local):
+
+```
+# /etc/fail2ban/jail.d/zzz-opennube-ignoreip.local
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1 192.168.91.99 172.17.17.99
+```
+`fail2ban-client -t` then `systemctl restart fail2ban`; verify with
+`fail2ban-client get ssh-iptables ignoreip`. This stops a SOGo user's password
+typo from banning the whole SOGo container's mail access.
