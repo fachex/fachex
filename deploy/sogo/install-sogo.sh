@@ -6,7 +6,7 @@
 set -euo pipefail
 
 PG_SOGO_PASS="${PG_SOGO_PASS:-$(openssl rand -base64 24 | tr -d '/+=' )}"
-TZ_NAME="${TZ_NAME:-America/Guayaquil}"
+TZ_NAME="${TZ_NAME:-America/New_York}"
 TMPL="${TMPL:-/root/sogo.conf.tmpl}"
 
 echo ">> [1/6] Base packages"
