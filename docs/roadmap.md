@@ -24,3 +24,27 @@ Outlook Web's pin has no IMAP/SOGo equivalent. Two paths:
   `$Pinned`) plus a pinned section in SOGo's message list. Self-contained,
   upstreamable to the SOGo project — a good first contribution rather than
   building a whole client.
+
+## Client domains on SOGo (parked — back burner)
+
+Goal: let client domains (e.g. `lsdomain.com`, `pegfl.com`) use SOGo too,
+replacing Roundcube for them.
+
+- **Auth is already half-solved:** the AD passdb falls through to Hestia's
+  passwd-file, so client mailboxes already authenticate at Dovecot. Clients log
+  in with their normal Hestia mailbox password (no AD).
+- **Missing piece:** a SOGo **SQL user source** for clients — a table
+  (`email`, `password-hash`, `domain`) mirroring Hestia's flat-file accounts
+  (`/etc/exim4/domains/<domain>/passwd`, **MD5-CRYPT** hashes), with SOGo set to
+  `userPasswordAlgorithm = md5-crypt`. A small sync (cron or folded into
+  `fachex-sync`) keeps the table in step with Hestia.
+- **Architecture decision (undecided):**
+  1. Separate "clients" SOGo container (Hestia-backed, no AD) — cleanest tenant
+     isolation from the internal AD SOGo; branded per client (e.g.
+     `email.lsdomain.com`). *(leaning recommendation)*
+  2. One shared SOGo, multi-tenant, using `SOGoDomainsVisibility` + per-domain
+     isolation so tenants can't see each other's GAL/free-busy.
+  3. Per-client SOGo — max isolation/branding, most containers.
+- **Watch-out:** GAL/address-book visibility must be scoped per domain so client
+  A can't see client B or opennube. (For the SQL client source, keep
+  `isAddressBook` off or per-domain.)
