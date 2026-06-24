@@ -66,9 +66,15 @@ See `docs/opennube-config.md` for the full profile.
   managesieve (4190 / Rules UI) deferred — see `docs/hestia-integration.md`.
 - ✅ **Front door live.** `https://email.opennube.net` → dedicated nginx proxy
   (Certbot TLS) → container nginx → SOGo. Styled login over HTTPS.
-- ⏳ **Phase 3 — AD authentication.** SOGo → AD (login + GAL), Dovecot auth,
-  one test `@opennube.net` mailbox. In progress.
-- ⏳ **Phase 4 — provisioning bridge** (`fachex-sync`), aliases, groups.
+- ✅ **Phase 3 — AD authentication + mail.** SOGo → AD (login + GAL). Dovecot
+  **AD passdb** (`sAMAccountName=%n`, tried before Hestia's passwd-file, clients
+  fall through) so AD passwords authenticate mailboxes live — no syncing.
+  Send (`smtp://587/?tls=YES`) + receive working. **Multi-domain aggregation**:
+  `@opennube.ai` added as a SOGo auxiliary account, same AD password. Hestia
+  dual-homed to VLAN 12 so Dovecot can reach the DC.
+- ⏳ **Phase 4 — provisioning bridge** (`fachex-sync`): auto-create Hestia
+  mailboxes + pre-seed SOGo auxiliary accounts when AD users are added; aliases,
+  groups. Also: SOGo for client domains (2nd source), `myopennube.com` once created.
 
 Start here: `docs/sogo-install.md` → `docs/hestia-integration.md` →
 `docs/email-vhost-setup.md` → Phase 3 in `docs/deployment.md`.

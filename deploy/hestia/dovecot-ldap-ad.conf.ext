@@ -1,0 +1,11 @@
+# AD passdb connection for Hestia's Dovecot (opennube users authenticate against AD).
+# Place at /etc/dovecot/dovecot-ldap-ad.conf.ext, chmod 600. Set dnpass to svc-mail's password.
+uris = ldaps://ONAD1.opennube.local
+dn = CN=svc-mail,OU=Service Accounts,DC=opennube,DC=local
+dnpass = CHANGE_ME_SVC_MAIL
+auth_bind = yes
+ldap_version = 3
+base = OU=OpenNube Co,DC=opennube,DC=local
+scope = subtree
+# %n = local part of the login; every domain mailbox shares it = the AD sAMAccountName
+pass_filter = (&(objectClass=person)(sAMAccountName=%n))
