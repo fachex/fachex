@@ -155,9 +155,36 @@ DMARC pass**. (`250 queued` = PMG accepted; Show-original = it landed authed.)
 Per-domain: `rm /etc/exim4/domains/<domain>/smtp_relay.conf` → instant revert to
 direct delivery (no reload needed). Global: `rm /etc/exim4/smtp_relay.conf`.
 
+## Disable PMG's own DKIM signing (critical)
+
+Hestia already DKIM-signs validly (`s=mail`, key published at
+`mail._domainkey.<domain>`). PMG, by default, was **also** signing outbound with
+its own selector `s=pmg` (Configuration → Mail Proxy → **DKIM**: *Enable DKIM
+Signing = Yes*, *Sign all Outgoing Mail = Yes*, *Signing Domain Source =
+Envelope*). That second signature was **broken** — Gmail reported
+`dkim=neutral (bad format) header.s=pmg`, and no `pmg._domainkey.<domain>` key
+was ever published. A malformed/unverifiable signature is a **spam signal** even
+when a second signature passes.
+
+**Fix: Configuration → Mail Proxy → DKIM → set "Enable DKIM Signing" = No.**
+(Don't just toggle "Sign all Outgoing Mail" — disable the feature entirely; PMG
+re-signing is redundant when Hestia signs correctly.) After this, Gmail shows a
+single clean `dkim=pass header.s=mail`, with SPF+DKIM+DMARC all passing.
+(Note: PMG's Sign Domains list also had a typo `opennue.net` — moot once
+disabled, but a latent bug if DKIM is ever re-enabled.)
+
+## Spam foldering after auth passes = cold-IP warmup
+With SPF/DKIM/DMARC all passing and FCrDNS aligned, residual spam-foldering is
+just `.178` having no sending history. Mark **Not spam**, reply, and send normal
+(non-"test") content for a day or two. The original problem was Microsoft
+*rejecting* (`550`); delivering-to-spam is a far softer, self-resolving state.
+
 ## Gotchas hit (so we don't relive them)
 - `554 Relay access denied` from PMG while `.182` *was* in `mynetworks` →
   `:25` has an `-o mynetworks=127.0.0.0/8,10.10.51.2` override. Use `:26`.
+- Mail delivered but landed in spam with `dkim=neutral (bad format) header.s=pmg`
+  → PMG double-signing with an unpublished/broken selector. Disable PMG DKIM
+  (above); let Hestia be the sole signer.
 - `postconf -h X` reads the *file*, not the running process — confirm with a
   real send, not just `postconf`.
 - PMG `myhostname` comes from the resolver **search domain** (`opennube.local`),
