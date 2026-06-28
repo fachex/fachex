@@ -47,3 +47,5 @@ Symptom: `550 5.7.1 ... blocked using Spamhaus` in NDRs.
   notice; monitor the IP on a blocklist watcher.
 - Durable option: route outbound through a reputable **smarthost/relay** so a
   single shared IP's reputation can't block all hosted domains.
+  **This is now the plan** — Hestia → Proxmox Mail Gateway (`51.222.33.178`,
+  clean IP) → internet. Full runbook: [`outbound-via-pmg.md`](outbound-via-pmg.md).
