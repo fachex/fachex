@@ -72,6 +72,16 @@ See `docs/opennube-config.md` for the full profile.
   Send (`smtp://587/?tls=YES`) + receive working. **Multi-domain aggregation**:
   `@opennube.ai` added as a SOGo auxiliary account, same AD password. Hestia
   dual-homed to VLAN 12 so Dovecot can reach the DC.
+- ✅ **Deliverability — outbound via Proxmox Mail Gateway.** Hestia now relays
+  outbound through PMG (clean IP `51.222.33.178`) instead of the shared
+  `51.222.33.182`, fixing Spamhaus-driven rejections. Working for `opennube.net`,
+  `opennube.ai`, and **`pegfl.com`** — the client's Microsoft recipient that
+  hard-bounced `550 Spamhaus` now accepts mail. Via HestiaCP's native per-domain
+  `smtp_relay.conf` → PMG `:26` (trusted submission port); DKIM preserved (Hestia
+  signs `s=mail`), PMG's broken double-signing disabled, SPF `+ip4:51.222.33.178`
+  per domain, PMG HELO/PTR = `pmg.opennube.com`, opportunistic TLS. Residual
+  Gmail/Microsoft Junk-foldering is cold-IP warmup (placement, not delivery).
+  Full runbook: [`docs/outbound-via-pmg.md`](docs/outbound-via-pmg.md).
 - ⏳ **Phase 4 — provisioning bridge** (`fachex-sync`): auto-create Hestia
   mailboxes + pre-seed SOGo auxiliary accounts when AD users are added; aliases,
   groups. Also: SOGo for client domains (2nd source), `myopennube.com` once created.

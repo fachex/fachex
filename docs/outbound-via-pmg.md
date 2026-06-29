@@ -144,12 +144,38 @@ Success line:
 Then Gmail → Show original: **SPF pass (51.222.33.178), DKIM pass (d=<domain>),
 DMARC pass**. (`250 queued` = PMG accepted; Show-original = it landed authed.)
 
-## Rollout order
-1. ✅ `opennube.net` (per-domain file) — working.
-2. Real-world send from SOGo as `fabian.lazarte@opennube.net`.
-3. `opennube.ai` — add `.178` to its SPF, then per-domain file.
-4. Global `/etc/exim4/smtp_relay.conf` for all domains (SPF each first).
-5. `pegfl.com` last (client's only mail channel — SPF first, then canary).
+## Rollout status
+Per-domain (NOT global — see warning below). Each: add `.178` to SPF first
+(single `v=spf1` record), confirm DKIM key present+published, drop the relay
+file, test.
+1. ✅ `opennube.net` — working; SOGo real sends reach Gmail inbox.
+2. ✅ `opennube.ai` — working (SPF `.178` added, single record).
+3. ✅ `pegfl.com` — working. **The Microsoft recipient that hard-bounced
+   `550 Spamhaus` now accepts the mail (no bounce).** Original problem solved.
+   (Gmail still Junk-folders pegfl while the IP warms — placement, not delivery.)
+4. Pending, per-domain when needed: `opennube.com.ar` (SPF `.178` first — it's
+   `p=quarantine`, so it WILL break if relayed without `.178`).
+
+### ⚠️ Do NOT use a global `/etc/exim4/smtp_relay.conf` (yet)
+A blanket global file routes *every* Hestia domain through `.178` immediately —
+and any domain whose SPF lacks `.178` then fails SPF. For `p=quarantine`/`reject`
+domains that means quarantine/reject at recipients. A 2026-06 audit of
+`/etc/exim4/domains/` found domains that would **break** on a global flip:
+`pegfl.com` and `opennube.com.ar` (both `p=quarantine`, `.178` not yet in SPF at
+audit time). Others need SPF hygiene first (`colinadeleste.com` has no SPF;
+`lsdomain.com` has a duplicate-`v=spf1` permerror + GoDaddy mail; `ultravos.com`
+has a stray `_dmarc` typo in its SPF; `neko.com.ar` runs mail on Cloudflare, not
+Hestia). Going global saves no SPF work (each domain still needs `.178`) and adds
+all-or-nothing risk. **Stay per-domain until every sending domain's SPF has
+`.178`.** Audit command:
+```bash
+for d in $(ls /etc/exim4/domains/); do
+  spf=$(dig +short TXT "$d" @8.8.8.8 | grep -i 'v=spf1' | tr -d '\n')
+  has178=$(echo "$spf" | grep -q '51.222.33.178' && echo YES || echo "no ")
+  dmarc=$(dig +short TXT _dmarc."$d" @8.8.8.8 | grep -io 'p=[a-z]*' | head -1)
+  printf '%-26s .178:%s  dmarc:%-12s %s\n' "$d" "$has178" "${dmarc:-none}" "$spf"
+done
+```
 
 ## Rollback
 Per-domain: `rm /etc/exim4/domains/<domain>/smtp_relay.conf` → instant revert to
