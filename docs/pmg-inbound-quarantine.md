@@ -5,6 +5,32 @@ Goal: inbound mail for opennube.net flows through PMG so spam is **quarantined**
 false positives. Companion to `outbound-via-pmg.md` (that covers the reverse
 direction).
 
+**Status: WORKING for opennube.net** (2026-06). MX repointed to PMG; inbound
+flows internet → PMG (filter) → Hestia → mailbox; spam (Level 5) is quarantined;
+the per-user Verbose spam report is delivered. Verified: a score-1003 GTUBE from
+an external sender was held in spam quarantine and surfaced in the report.
+
+## Gotchas hit during the cutover (read before repeating for another domain)
+- **MX hostname typo:** the MX was first set to `pmg.opennube.**net**` (no A
+  record) → unresolvable → **all inbound broke** until corrected to
+  `pmg.opennube.com`. Use the `.com` name (matches PTR/HELO/cert).
+- **The spam-quarantine rule was disabled.** PMG → Mail Filter →
+  `Quarantine/Mark Spam (Level 5)` was OFF (only Level 3 *Modify/tag* was on, and
+  `Block Spam (Level 10)` should stay OFF so high scores are *held*, not dropped).
+  Enabling Level 5 is what makes spam land in quarantine. Confirm its log line:
+  `moved mail for <…> to spam quarantine (rule: Quarantine/Mark Spam (Level 5))`.
+- **Quarantine GUI date filter:** `Since=Until=<today>` shows "No data in
+  database / No match found" because `Until` is treated as start-of-day, excluding
+  same-day mail. Widen `Until` to tomorrow.
+- **GTUBE can't be *sent* through Gmail/M365** (they block it outbound). Test by
+  injecting with `swaks` straight to PMG `:25`, or from an external box.
+- **Hestia message-size limit vs PMG:** PMG's `Message Size` (Options) was 10 MB,
+  smaller than Hestia — so large *outbound* (e.g. `paulo@pegfl.com`) hit
+  `552 Message size exceeds fixed limit`. Raise PMG to ≥ Hestia (e.g. 50 MB).
+- **PMG SpamAssassin DNSBL queries** (`dnswl.org`, `uribl.com`) get rate-limited
+  from a public resolver (`RCVD_IN_DNSWL_BLOCKED` / `URIBL_BLOCKED`), degrading
+  scoring. Fix with a local caching resolver or `dns_query_restriction deny`.
+
 ## Root cause found (2026-06): inbound bypasses PMG entirely
 
 PMG is **fully configured** to be opennube.net's inbound gateway — except the one
