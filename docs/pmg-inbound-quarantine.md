@@ -1,0 +1,96 @@
+# Inbound filtering + spam quarantine via PMG
+
+Goal: inbound mail for opennube.net flows through PMG so spam is **quarantined**
+(held, reviewable) and each user gets a spam report with the ability to release
+false positives. Companion to `outbound-via-pmg.md` (that covers the reverse
+direction).
+
+## Root cause found (2026-06): inbound bypasses PMG entirely
+
+PMG is **fully configured** to be opennube.net's inbound gateway — except the one
+step that actually directs mail to it. Verified from the boxes:
+
+| Check | Value | Meaning |
+|---|---|---|
+| `dig MX opennube.net` | `0 mail.opennube.net` → Hestia `.182` | **MX points to Hestia, not PMG** |
+| `grep to=<…opennube.net>` on PMG | (nothing) | no opennube.net inbound ever reaches PMG |
+| PMG Relay Domains | `opennube.net` | PMG *is* set to handle it |
+| PMG Transports | `opennube.net → 51.222.33.182:25, Use MX: No` | PMG would forward filtered mail to Hestia |
+| PMG Spam Quarantine | empty (3+ months) | nothing to quarantine — PMG never sees the mail |
+
+So the world delivers opennube.net mail straight to Hestia (`mail.opennube.net`
+→ `.182`); PMG only does **outbound relay** today. The "37 incoming junk" on
+PMG's status report is just spam bots hitting PMG's public `.178:25` directly —
+not real opennube.net mail. **No spam rule will ever populate the quarantine
+until inbound actually transits PMG.**
+
+## The fix: repoint the MX to PMG
+
+Change opennube.net's MX (at GoDaddy) from `mail.opennube.net` to:
+```
+opennube.net.  MX  0  pmg.opennube.com.
+```
+`pmg.opennube.com` already resolves to `.178` (the pfSense NAT to PMG `:25`, which
+already receives — the bot junk proves `:25` is forwarded to PMG). Flow becomes:
+internet → PMG `:25` (filter + quarantine) → transport → Hestia `.182:25` → mailbox.
+
+### Safe sequence (it's live inbound — validate before touching DNS)
+1. **Pre-test PMG→Hestia forwarding without changing DNS** — on PMG:
+   ```bash
+   nc -zv 51.222.33.182 25                       # PMG can reach Hestia SMTP?
+   apt-get install -y swaks                       # PMG is Debian; apt OK here (NOT the Hestia box)
+   swaks --to fabian.lazarte@opennube.net --from test@example.com \
+         --server 127.0.0.1:25 --header "Subject: PMG inbound path test" \
+         --body "Testing PMG forward to Hestia."
+   ```
+   If it lands in the opennube.net **mailbox**, PMG→Hestia works and Hestia accepts
+   PMG's mail. (A localhost-injected clean message is treated as relay → uses the
+   opennube.net transport → forwards to `.182`.)
+2. **Only then change the MX** → `pmg.opennube.com`.
+3. **Test real inbound** from Gmail: clean → inbox via PMG; spammy → Spam Quarantine.
+4. **Rollback** anytime: MX back to `mail.opennube.net`.
+
+### Watch-outs
+- **SPF on forwarded mail:** mail reaches Hestia from `.178` with the *original*
+  external sender — strict inbound SPF on Hestia could reject it. Hestia must
+  **trust PMG `.178`** as its upstream gateway (skip SPF/spam re-checks for it).
+  The pre-test reveals this: if the test message doesn't arrive, whitelist `.178`
+  on Hestia.
+- **fail2ban:** add `51.222.33.178` to Hestia's `ignoreip` so PMG's deliveries
+  can't get it banned (see hestia-integration.md ops note).
+- **Direction:** PMG's spam rules are direction `In`; they only apply once the MX
+  sends real external mail through PMG. Localhost/trusted injections count as
+  `Out` and skip the inbound spam rules.
+
+## Quarantine + per-user spam report config (PMG)
+
+Discovered state and what to set:
+
+- **Mail Filter rules** (Configuration → Mail Filter): the spam **quarantine** rule
+  was **disabled**. Factory rules present:
+  - `Quarantine/Mark Spam (Level 3)` — action *Modify* (tags `[SPAM]`, delivers) — was the only spam rule on.
+  - `Quarantine/Mark Spam (Level 5)` — action *Quarantine* — **was OFF; enable it.** ← the fix for "nothing is held"
+  - `Block Spam (Level 10)` — action *Block* (discard) — **leave OFF** so high-scoring
+    false positives are *held*, not discarded.
+- **Spam Detector → Options:** RBL + Razor2 on, Bayesian off, Heuristic 3 (scoring works).
+- **Spam Detector → Quarantine:**
+  - `User Spamreport Style = Verbose` → per-user reports ON.
+  - `Authentication mode = Ticket` → report links Deliver/Whitelist **without login**.
+  - `EMail From = pmgreport@opennube.net`.
+  - `Quarantine Host = none` → **set to `pmg.opennube.com`** so the report's action
+    links resolve (`:8006` is NATed through pfSense).
+  - Lifetime 7 days.
+- Send reports on demand for testing: `pmgqm send` (runs daily by default).
+
+Per-user **login** to browse/release quarantine (deferred — "Piece 2"): needs PMG
+LDAP/AD integration (Configuration → LDAP → AD `ONAD1.opennube.local`) so users
+authenticate and see only their own quarantine, plus exposing the quarantine UI
+(reverse proxy `quarantine.opennube.net → 10.10.51.4:8006`, or the NAT already in
+place). Not required for Ticket-mode report links.
+
+## PMG environment facts (reference)
+- PMG 8.2.0, single NIC `ens18 = 10.10.51.4/29`, gw `10.10.51.1`. No public IP on
+  the box — `51.222.33.178` is a **pfSense NAT** (`.178 ⇄ 10.10.51.4`).
+- Ports: External SMTP `25` (inbound), Internal SMTP `26` (trusted/outbound relay).
+- `:8006` (admin + quarantine UI) is NATed through pfSense.
+- HELO/`myhostname = pmg.opennube.com`; PTR `.178 → pmg.opennube.com`.
