@@ -23,6 +23,19 @@ Post-cutover cleanups done:
   negligible. (`grep -r forward-addr /etc/unbound/` must be empty = direct
   recursion, not forwarding to the blocked public resolvers.)
 
+> ⚠️ **The unbound/`resolv.conf`→127.0.0.1 change is PMG-ONLY.** PMG and the SOGo
+> container need *opposite* DNS: PMG uses local `unbound` (public recursion, for
+> DNSBLs); **SOGo must use the AD domain controller (`172.17.17.100`) as its
+> resolver** so it can resolve internal `.local` names like
+> `ONAD1.opennube.local`. Pasting the PMG unbound commands into the SOGo CT once
+> repointed SOGo to 127.0.0.1 → unbound can't resolve `.local` → SOGo `LDAPSource:
+> Can't contact LDAP server` for the svc-mail bind → **all SOGo logins fail** (DC
+> is fine; only the *name* won't resolve). Fix: restore SOGo's
+> `/etc/resolv.conf` to `search opennube.local` + `nameserver 172.17.17.100`,
+> `systemctl disable --now unbound`, `systemctl restart sogo`. Diagnosis tell:
+> `ping 172.17.17.100` works but `getent hosts ONAD1.opennube.local` returns
+> nothing.
+
 To add another domain (recipe): PMG Relay Domains + Transport (`<domain> →
 51.222.33.182:25, Use MX No`) → `v-delete-mail-domain-antispam` on Hestia →
 swaks pretest to PMG `:25` → flip MX to `pmg.opennube.com`.
