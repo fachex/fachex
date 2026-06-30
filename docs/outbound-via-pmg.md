@@ -153,8 +153,57 @@ file, test.
 3. ✅ `pegfl.com` — working. **The Microsoft recipient that hard-bounced
    `550 Spamhaus` now accepts the mail (no bounce).** Original problem solved.
    (Gmail still Junk-folders pegfl while the IP warms — placement, not delivery.)
-4. Pending, per-domain when needed: `opennube.com.ar` (SPF `.178` first — it's
+4. ✅ `lsdomain.com` — working, SPF+DKIM+DMARC all pass. Client domain
+   (Hestia-local passwords, not AD). This rollout surfaced a PMG-wide
+   DKIM-breaking bug — see the critical warning below.
+5. Pending, per-domain when needed: `opennube.com.ar` (SPF `.178` first — it's
    `p=quarantine`, so it WILL break if relayed without `.178`).
+
+## ⚠️ CRITICAL: PMG's "Add Disclaimer" rule breaks DKIM for ALL relayed domains
+
+**Mail Filter → Rules → "Add Disclaimer" (priority 60, direction Out) must stay
+DISABLED.** Hestia signs DKIM over the body *before* handing mail to PMG; if PMG
+then appends disclaimer text to the body, the signed `bh=` (body hash) no longer
+matches → receivers report `dkim=neutral (body hash did not verify)` → DMARC
+fails too (no aligned pass) → mail is more likely spam-foldered/rejected,
+**silently** — PMG's own log still shows `250 ... queued`, looking completely
+successful.
+
+Discovered via `lsdomain.com` (Gmail reported `dkim=neutral (body hash did not
+verify)`, and the disclaimer footer was visibly present in the delivered body).
+**This rule is global**, not domain-scoped — if it's ever re-enabled it can
+silently break DKIM for opennube.net/.ai/pegfl.com/lsdomain.com simultaneously.
+After disabling it, a fresh lsdomain.com test confirmed `dkim=pass` with no
+disclaimer in the body.
+
+**If a disclaimer is ever wanted**, inject it *before* DKIM signing — at the
+Hestia/Exim level (e.g. a per-domain footer in the system filter), not at PMG.
+Do not re-enable PMG's "Add Disclaimer" rule for relayed mail.
+
+**Note:** the earlier "passing" DKIM tests for opennube.net/.ai/pegfl predate
+this discovery and were only checked via headers, not the message body. If
+deliverability issues recur on those domains, re-test and inspect the body for
+a disclaimer footer, not just Authentication-Results.
+
+## lsdomain.com — domain-specific gotchas hit
+- **DKIM private key got pasted into chat** (`v-list-mail-domain-dkim` dumped
+  the raw `dkim.pem`). Treated as compromised: regenerated via
+  `v-delete-mail-domain-dkim` + `v-add-mail-domain-dkim`, then extracted *only*
+  the public key with `openssl rsa -pubout | grep -v -- '-----' | tr -d '\n'`
+  (never cat the private `.pem` in chat/logs).
+- **GoDaddy DNS "Name" field double-domain trap:** typing the full
+  `mail._domainkey.lsdomain.com` as the Name created
+  `mail._domainkey.lsdomain.com.lsdomain.com` (GoDaddy auto-appends the zone).
+  Enter just the relative label (`mail._domainkey`) in GoDaddy's Name field.
+- **Negative DNS caching after rapid edits:** deleting/re-adding records in
+  quick succession caused a transient `NXDOMAIN` cached by `8.8.8.8` (SOA
+  negative TTL 600s) even though GoDaddy's authoritative NS
+  (`ns55/56.domaincontrol.com`) had the correct record the whole time. Query the
+  authoritative NS directly (`dig TXT <name> @ns55.domaincontrol.com`) to tell
+  "really missing" from "resolver cache lag."
+- **lsdomain.com had no DMARC record** (unlike opennube.net/.ai/pegfl, which
+  already had `p=quarantine`). Published a starter monitor-only policy:
+  `v=DMARC1; p=none; rua=mailto:fabian@lsdomain.com`.
 
 ### ⚠️ Do NOT use a global `/etc/exim4/smtp_relay.conf` (yet)
 A blanket global file routes *every* Hestia domain through `.178` immediately —
