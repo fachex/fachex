@@ -5,10 +5,27 @@ Goal: inbound mail for opennube.net flows through PMG so spam is **quarantined**
 false positives. Companion to `outbound-via-pmg.md` (that covers the reverse
 direction).
 
-**Status: WORKING for opennube.net** (2026-06). MX repointed to PMG; inbound
-flows internet → PMG (filter) → Hestia → mailbox; spam (Level 5) is quarantined;
-the per-user Verbose spam report is delivered. Verified: a score-1003 GTUBE from
-an external sender was held in spam quarantine and surfaced in the report.
+**Status: WORKING for opennube.net + opennube.ai** (2026-06). MX repointed to PMG
+for both; inbound flows internet → PMG (filter) → Hestia → mailbox; spam (Level 5)
+is quarantined; the per-user Verbose spam report is delivered. Verified: a
+score-1003 GTUBE held in spam quarantine and surfaced in the report.
+
+Post-cutover cleanups done:
+- **Hestia antispam disabled per-domain** (`v-delete-mail-domain-antispam <owner>
+  <domain>`) for opennube.net + opennube.ai so PMG-filtered mail isn't re-scored /
+  double-tagged at Hestia. (Owner found via `v-search-domain-owner <domain>`;
+  antivirus left on as harmless defense-in-depth.)
+- **Local recursive resolver on PMG** — installed `unbound`, pointed
+  `/etc/resolv.conf` at `127.0.0.1`. Spamhaus ZEN now resolves (the high-value
+  DNSBL; it blocks public resolvers). dnswl.org/uribl.com still refuse free-tier
+  queries from the cloud IP — SpamAssassin self-disables them via
+  `/root/.spamassassin/dnsblock_*` markers (leave them); score impact is ~0.001,
+  negligible. (`grep -r forward-addr /etc/unbound/` must be empty = direct
+  recursion, not forwarding to the blocked public resolvers.)
+
+To add another domain (recipe): PMG Relay Domains + Transport (`<domain> →
+51.222.33.182:25, Use MX No`) → `v-delete-mail-domain-antispam` on Hestia →
+swaks pretest to PMG `:25` → flip MX to `pmg.opennube.com`.
 
 ## Gotchas hit during the cutover (read before repeating for another domain)
 - **MX hostname typo:** the MX was first set to `pmg.opennube.**net**` (no A
