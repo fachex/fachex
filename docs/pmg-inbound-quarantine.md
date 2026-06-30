@@ -5,10 +5,28 @@ Goal: inbound mail for opennube.net flows through PMG so spam is **quarantined**
 false positives. Companion to `outbound-via-pmg.md` (that covers the reverse
 direction).
 
-**Status: WORKING for opennube.net + opennube.ai** (2026-06). MX repointed to PMG
-for both; inbound flows internet → PMG (filter) → Hestia → mailbox; spam (Level 5)
-is quarantined; the per-user Verbose spam report is delivered. Verified: a
-score-1003 GTUBE held in spam quarantine and surfaced in the report.
+**Status: WORKING for opennube.net + opennube.ai + lsdomain.com** (2026-06). MX
+repointed to PMG for all three; inbound flows internet → PMG (filter) → Hestia →
+mailbox; spam (Level 5) is quarantined; the per-user Verbose spam report is
+delivered (domain-agnostic — `pmgqm send` covers any mailbox with held mail, no
+extra per-domain report config). Verified each with a GTUBE/spam test held in
+quarantine and surfaced in the report.
+
+**lsdomain.com is a client domain** (Hestia-local mailbox passwords, not AD) —
+treated with pegfl-level caution: full pre-flight before any DNS change.
+Pre-flight found and handled:
+- **Duplicate `v=spf1` records** (`ip4:.../31`-only + the real one) — same
+  permerror trap as opennube.net/.ai. Deleted the redundant one; kept/edited the
+  `mx mx:mail.lsdomain.com include:secureserver.net` record (added `.178` for a
+  future outbound rollout).
+- **`include:secureserver.net` in SPF** turned out to be legacy/harmless — `dig
+  mail.lsdomain.com` resolves (via a CNAME to the bare domain) to `51.222.33.182`,
+  confirming mail is 100% Hestia-hosted, nothing actually depends on GoDaddy.
+  *Always confirm the MX target's A/CNAME chain before relying on SPF alone to
+  judge where mail is hosted.*
+- **DKIM key exists on Hestia but was never published** to
+  `mail._domainkey.lsdomain.com` — pre-existing gap, unrelated to inbound, flagged
+  for whenever outbound deliverability work touches this domain.
 
 Post-cutover cleanups done:
 - **Hestia antispam disabled per-domain** (`v-delete-mail-domain-antispam <owner>
