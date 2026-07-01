@@ -25,10 +25,28 @@ Outlook Web's pin has no IMAP/SOGo equivalent. Two paths:
   upstreamable to the SOGo project — a good first contribution rather than
   building a whole client.
 
-## Client domains on SOGo (parked — back burner)
+## Client domains on SOGo (decided — closed, not building the SQL source)
 
-Goal: let client domains (e.g. `lsdomain.com`, `pegfl.com`) use SOGo too,
-replacing Roundcube for them.
+Original goal: let client domains (e.g. `lsdomain.com`, `pegfl.com`) use SOGo
+too, replacing Roundcube for them, via a dedicated SOGo SQL user source (see
+below for the design that was scoped but not built).
+
+**Decision (2026-07):** not needed.
+- **pegfl.com** — the client mostly uses Outlook desktop, rarely touches a web
+  client, so there's no real demand for SOGo there. Stays on Roundcube/Outlook.
+- **lsdomain.com** — effectively Fabian's personal domain. Added as a plain
+  **secondary IMAP account** inside the existing AD-backed SOGo (Preferences →
+  Mail → Accounts → Add Mail Account: server `mail.opennube.net`, IMAP 993,
+  SMTP 587 STARTTLS, username = full `user@lsdomain.com` address + its own
+  Hestia mailbox password). No SOGo-side config changed — Dovecot already
+  authenticates it via the existing AD-passdb-falls-through-to-Hestia chain.
+  Outbound from this account automatically relays through PMG since
+  `lsdomain.com` already has `smtp_relay.conf` set up.
+- Net: the SQL user source / separate-tenant work below is **shelved**. Revisit
+  only if another client domain specifically wants a SOGo web client of its own.
+
+<details>
+<summary>Original design notes (kept for reference if this is revisited)</summary>
 
 - **Auth is already half-solved:** the AD passdb falls through to Hestia's
   passwd-file, so client mailboxes already authenticate at Dovecot. Clients log
@@ -48,3 +66,5 @@ replacing Roundcube for them.
 - **Watch-out:** GAL/address-book visibility must be scoped per domain so client
   A can't see client B or opennube. (For the SQL client source, keep
   `isAddressBook` off or per-domain.)
+
+</details>
