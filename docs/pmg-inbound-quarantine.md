@@ -58,6 +58,28 @@ To add another domain (recipe): PMG Relay Domains + Transport (`<domain> →
 51.222.33.182:25, Use MX No`) → `v-delete-mail-domain-antispam` on Hestia →
 swaks pretest to PMG `:25` → flip MX to `pmg.opennube.com`.
 
+## Symptom: inbound "takes a while" or seems to vanish — check Transports for typos
+2026-07-01: `info@opennube.ai` inbound was taking ~20 minutes to reach webmail.
+Cause: the PMG Transport for `opennube.ai` had a single-digit typo —
+**`51.222.44.182` instead of `51.222.33.182`** (Hestia's real IP). PMG accepted
+and filtered the mail fine, then Postfix's handoff to the transport host failed
+(`Connection refused`, since `.44.` isn't a real host) and the message sat
+**deferred**, backing off ~9-10 minutes between retries — mail wasn't lost or
+even really "slow," it was silently failing and retrying against a nonexistent
+IP until someone happened to fix the typo mid-retry-cycle.
+
+**Diagnostic:** `grep '<recipient>' /var/log/mail.log` on PMG — look for
+`status=deferred (delivery temporarily suspended: connect to <IP>:25:
+Connection refused)`. If the IP in that line doesn't match Hestia's real egress
+(`51.222.33.182`), check **Configuration → Mail Proxy → Transports** for a typo
+in that domain's Host field. Compare against the other working rows — a
+correct config looks like every relay domain pointing at the identical
+`51.222.33.182:25, Use MX: No`.
+
+**After fixing a Transport typo**, flush the deferred queue immediately instead
+of waiting for the next backoff: `postqueue -f`, then `postqueue -p` to confirm
+the queue is empty.
+
 ## Gotchas hit during the cutover (read before repeating for another domain)
 - **MX hostname typo:** the MX was first set to `pmg.opennube.**net**` (no A
   record) → unresolvable → **all inbound broke** until corrected to
